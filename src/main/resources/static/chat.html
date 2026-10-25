@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedRAG · 医疗知识库问答演示</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, "Microsoft YaHei", sans-serif; background: #f6f7f9; color: #1f2937; }
+        .wrap { max-width: 760px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.06); overflow: hidden; }
+        header { padding: 18px 22px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 16px; margin: 0; }
+        header input { width: 150px; font-size: 12px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 6px; }
+        #box { height: 460px; overflow-y: auto; padding: 18px 22px; }
+        .msg { margin-bottom: 14px; display: flex; gap: 10px; }
+        .who { flex: 0 0 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; }
+        .user .who { background: #2563eb; }
+        .bot .who { background: #059669; }
+        .bubble { background: #f3f4f6; padding: 10px 14px; border-radius: 10px; line-height: 1.6; white-space: pre-wrap; font-size: 14px; }
+        .user .bubble { background: #e8f0fe; }
+        .cites { margin-top: 8px; font-size: 12px; color: #6b7280; }
+        .cites span { display: inline-block; background: #fff; border: 1px solid #e5e7eb; border-radius: 4px; padding: 1px 6px; margin-right: 6px; }
+        footer { display: flex; gap: 10px; padding: 14px 22px; border-top: 1px solid #eee; }
+        footer input { flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+        footer button { padding: 10px 20px; border: 0; border-radius: 8px; background: #2563eb; color: #fff; font-size: 14px; cursor: pointer; }
+        footer button:disabled { background: #9ca3af; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <header>
+        <h1>MedRAG · 医疗知识库问答</h1>
+        <input id="apiKey" value="dev-key" title="X-API-KEY">
+    </header>
+    <div id="box"></div>
+    <footer>
+        <input id="q" placeholder="例如：小孩发烧 38.5 度要挂哪个科？" autofocus>
+        <button id="send" onclick="ask()">发送</button>
+    </footer>
+</div>
+<script>
+    let conversationId = null;
+
+    function add(role, text) {
+        const box = document.getElementById('box');
+        const div = document.createElement('div');
+        div.className = 'msg ' + role;
+        div.innerHTML = `<div class="who">${role === 'user' ? '我' : 'AI'}</div><div class="bubble"></div>`;
+        div.querySelector('.bubble').textContent = text;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+        return div;
+    }
+
+    async function ask() {
+        const input = document.getElementById('q');
+        const btn = document.getElementById('send');
+        const question = input.value.trim();
+        if (!question) return;
+        input.value = '';
+        add('user', question);
+        const node = add('bot', '思考中…');
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-API-KEY': document.getElementById('apiKey').value },
+                body: JSON.stringify({ conversationId, question })
+            });
+            const json = await resp.json();
+            if (json.code !== 0) throw new Error(json.message || '请求失败');
+            const data = json.data;
+            conversationId = data.conversationId;
+            node.querySelector('.bubble').textContent = data.answer;
+            if (data.citations && data.citations.length) {
+                const cites = document.createElement('div');
+                cites.className = 'cites';
+                cites.innerHTML = data.citations.map(c =>
+                    `<span>[${c.index}] ${c.fileName}${c.page ? ' 第' + c.page + '页' : ''}</span>`).join('');
+                node.querySelector('.bubble').appendChild(cites);
+            }
+        } catch (e) {
+            node.querySelector('.bubble').textContent = '出错了：' + e.message;
+        } finally {
+            btn.disabled = false;
+            document.getElementById('q').focus();
+        }
+    }
+
+    document.getElementById('q').addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+</script>
+</body>
+</html>

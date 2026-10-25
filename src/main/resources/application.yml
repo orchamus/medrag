@@ -1,0 +1,89 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: medrag
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/medrag}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      timeout: 3000ms
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
+      continue-on-error: false
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+  ai:
+    # 通义千问：DashScope 的 OpenAI 兼容端点
+    openai:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: ${DASHSCOPE_API_KEY}
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.3
+      embedding:
+        options:
+          model: text-embedding-v3
+          dimensions: 1024
+
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        dimensions: 1024
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        table-name: vector_store
+        schema-name: public
+
+# ---------------- 业务配置 ----------------
+app:
+  api-key: ${APP_API_KEY:dev-key}
+  ai:
+    system-prompt: |
+      你是"仁和医院"的智能导诊助手，帮助用户判断该挂哪个科、如何就医。
+      规则：
+      1. 只依据提供的资料回答；资料中没有的内容，直接回答"我没有查到相关信息，建议咨询导诊台（0592-1234567）"。
+      2. 使用中文，回答控制在 150 字以内，先给结论再给理由。
+      3. 涉及科室推荐时，给出科室名称和判断依据。
+      4. 不确定时不要编造医生、价格、药品或检查项目。
+  rag:
+    top-k: 5
+    similarity-threshold: 0.70
+    chunk-size: 512
+    chunk-overlap: 64
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.example.medrag: DEBUG
+    org.springframework.ai: INFO
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

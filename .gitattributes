@@ -1,0 +1,17 @@
+# 统一换行符，避免 Windows/CI 下 diff 全红
+* text=auto eol=lf
+
+# 二进制文件不做换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.zip binary
+
+# 脚本保持 LF
+*.sh text eol=lf
+*.cmd text eol=crlf

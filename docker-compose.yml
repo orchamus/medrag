@@ -1,0 +1,56 @@
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: medrag-pg
+    environment:
+      POSTGRES_DB: medrag
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d medrag"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: medrag-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # 应用镜像：需要源码编译，默认不启动
+  # 用法：docker compose --profile app up -d --build
+  app:
+    profiles: ["app"]
+    build: .
+    container_name: medrag-app
+    depends_on:
+      pgvector:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://pgvector:5432/medrag
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      SPRING_DATA_REDIS_HOST: redis
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      APP_API_KEY: ${APP_API_KEY:-dev-key}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
+  redisdata:
